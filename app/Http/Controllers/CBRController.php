@@ -33,36 +33,36 @@ class CBRController extends Controller
         $inputGejala = [];
 
         // 🔥 DETEKSI GEJALA
-        foreach ($semuaGejala as $g) {
+       // 🔥 DETEKSI GEJALA - harus cocok minimal 50% kata gejala
+foreach ($semuaGejala as $g) {
+    $nama = strtolower($g->nama_gejala);
+    $nama = preg_replace('/[^a-z0-9\s]/', ' ', $nama);
+    $nama = preg_replace('/\s+/', ' ', trim($nama));
+    $gejalaWords = array_filter(explode(' ', $nama));
 
-            $nama = strtolower($g->nama_gejala);
-            $nama = preg_replace('/[^a-z0-9\s]/', ' ', $nama);
-            $nama = preg_replace('/\s+/', ' ', trim($nama));
-
-            $gejalaWords = array_filter(explode(' ', $nama));
-
-            $score = 0;
-
-            foreach ($gejalaWords as $word) {
-                if (in_array($word, $inputWords)) {
-                    $score++;
-                }
-            }
-
-            if ($score > 0) {
-                $inputGejala[$g->id] = $score;
-            }
+    $matchCount = 0;
+    foreach ($gejalaWords as $word) {
+        if (strlen($word) > 2 && in_array($word, $inputWords)) {
+            $matchCount++;
         }
+    }
 
-        if (empty($inputGejala)) {
-            return back()->with('error', 'Gejala tidak dikenali, coba lebih spesifik');
-        }
+    // Harus cocok minimal 50% kata dari nama gejala
+    $threshold = count($gejalaWords) > 0 
+        ? $matchCount / count($gejalaWords) 
+        : 0;
+
+    if ($matchCount > 0 && $threshold >= 0.5) {
+        $inputGejala[$g->id] = $threshold;
+    }
+}
 
         // 🔥 HITUNG KEMIRIPAN
         $kasusList = Kasus::with(['gejala', 'diagnosa'])->get();
-       $hasil = collect($kasusList)->map(function ($kasus) use ($inputGejala) {
+       // 🔥 HITUNG KEMIRIPAN - pakai bobot pivot
+$hasil = collect($kasusList)->map(function ($kasus) use ($inputGejala) {
 
-    $gejalaKasus = $kasus->gejala; // objek dengan pivot bobot
+    $gejalaKasus = $kasus->gejala;
 
     $totalBobot = 0;
     $matchScore = 0;
@@ -72,11 +72,21 @@ class CBRController extends Controller
         $totalBobot += $bobot;
 
         if (isset($inputGejala[$g->id])) {
-            $matchScore += $bobot;
+            $matchScore += $bobot * $inputGejala[$g->id];
         }
     }
 
-    $similarity = $totalBobot > 0 ? $matchScore / $totalBobot : 0;
+    // Penalty jika banyak gejala input yang tidak ada di kasus
+    $inputCount = count($inputGejala);
+    $matchCount = count(array_intersect(
+        array_keys($inputGejala), 
+        $gejalaKasus->pluck('id')->toArray()
+    ));
+    $coveragePenalty = $inputCount > 0 ? $matchCount / $inputCount : 0;
+
+    $similarity = $totalBobot > 0 
+        ? ($matchScore / $totalBobot) * $coveragePenalty 
+        : 0;
 
     return [
         'kasus_id' => $kasus->id,
