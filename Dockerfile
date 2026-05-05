@@ -6,10 +6,12 @@ COPY . .
 
 RUN apt-get update && apt-get install -y \
     unzip git curl libzip-dev zip \
-    && docker-php-ext-install zip pdo pdo_mysql
+    && docker-php-ext-install zip
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 RUN composer install
+
+RUN docker-php-ext-install pdo pdo_mysql
 
 CMD php artisan migrate --force && php -S 0.0.0.0:$PORT -t public
