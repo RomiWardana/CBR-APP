@@ -21,7 +21,7 @@ class Kasus extends Model
             'gejala_id',
             'id',
             'id'
-        );
+        )->withPivot('bobot');
     }
 
     // 🔥 relasi ke diagnosa (one-to-one / belongsTo)

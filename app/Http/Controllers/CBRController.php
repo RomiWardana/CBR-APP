@@ -62,18 +62,21 @@ class CBRController extends Controller
         $kasusList = Kasus::with(['gejala', 'diagnosa'])->get();
        $hasil = collect($kasusList)->map(function ($kasus) use ($inputGejala) {
 
-    $gejalaKasus = $kasus->gejala->pluck('id')->toArray();
+    $gejalaKasus = $kasus->gejala; // objek dengan pivot bobot
 
-    $totalScore = 0;
-    $totalWeight = count($gejalaKasus) * 3;
+    $totalBobot = 0;
+    $matchScore = 0;
 
-    foreach ($gejalaKasus as $id) {
-        if (isset($inputGejala[$id])) {
-            $totalScore += $inputGejala[$id];
+    foreach ($gejalaKasus as $g) {
+        $bobot = $g->pivot->bobot ?? 1;
+        $totalBobot += $bobot;
+
+        if (isset($inputGejala[$g->id])) {
+            $matchScore += $bobot;
         }
     }
 
-    $similarity = $totalWeight > 0 ? $totalScore / $totalWeight : 0;
+    $similarity = $totalBobot > 0 ? $matchScore / $totalBobot : 0;
 
     return [
         'kasus_id' => $kasus->id,
