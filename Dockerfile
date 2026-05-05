@@ -12,4 +12,4 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 RUN composer install
 
-CMD php -S 0.0.0.0:10000 -t public
+CMD php artisan migrate --force && php -S 0.0.0.0:$PORT -t public
