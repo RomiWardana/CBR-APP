@@ -33,30 +33,37 @@ class CBRController extends Controller
         $inputGejala = [];
 
         // 🔥 DETEKSI GEJALA
-        foreach ($semuaGejala as $g) {
+        // 🔥 DETEKSI GEJALA - partial match
+foreach ($semuaGejala as $g) {
+    $nama = strtolower($g->nama_gejala);
+    $nama = preg_replace('/[^a-z0-9\s]/', ' ', $nama);
+    $nama = preg_replace('/\s+/', ' ', trim($nama));
+    $gejalaWords = array_filter(explode(' ', $nama));
 
-            $nama = strtolower($g->nama_gejala);
-            $nama = preg_replace('/[^a-z0-9\s]/', ' ', $nama);
-            $nama = preg_replace('/\s+/', ' ', trim($nama));
+    $stopwords = ['tidak', 'dan', 'atau', 'yang', 'di', 'ke', 'dari', 'ada', 'nya', 'bisa', 'saat', 'pada', 'dengan', 'sering'];
 
-            $gejalaWords = array_filter(explode(' ', $nama));
+    // Kata kunci penting dari nama gejala (tanpa stopwords, panjang > 3)
+    $keywords = array_filter($gejalaWords, fn($w) => strlen($w) > 3 && !in_array($w, $stopwords));
 
-            $score = 0;
+    if (empty($keywords)) continue;
 
-            foreach ($gejalaWords as $word) {
-                if (in_array($word, $inputWords)) {
-                    $score++;
-                }
-            }
-
-            if ($score > 0) {
-                $inputGejala[$g->id] = $score;
+    $matchCount = 0;
+    foreach ($keywords as $keyword) {
+        foreach ($inputWords as $inputWord) {
+            // Cek apakah kata input mengandung keyword atau sebaliknya
+            if (str_contains($inputWord, $keyword) || str_contains($keyword, $inputWord)) {
+                $matchCount++;
+                break;
             }
         }
+    }
 
-        if (empty($inputGejala)) {
-            return back()->with('error', 'Gejala tidak dikenali, coba lebih spesifik');
-        }
+    // Cocok minimal 1 kata kunci penting
+    if ($matchCount >= 1) {
+        $ratio = $matchCount / count($keywords);
+        $inputGejala[$g->id] = $ratio;
+    }
+}
 
         // 🔥 HITUNG KEMIRIPAN
         $kasusList = Kasus::with(['gejala', 'diagnosa'])->get();
