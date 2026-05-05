@@ -12,6 +12,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 RUN composer install
 
-RUN docker-php-ext-install pdo pdo_mysql
+RUN docker-php-ext-install pcntl pdo pdo_mysql
 
 CMD php artisan migrate --force && php -S 0.0.0.0:$PORT -t public
